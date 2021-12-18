@@ -1,2 +1,16 @@
+target/
 *.class
 *.log
+.history
+.cache
+.lib/
+
+.classpath
+.project
+.settings/
+
+# IntelliJ project files
+.idea
+*.iml
+out
+gen
