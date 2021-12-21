@@ -2,7 +2,8 @@ package com.spike.sparkstreaming.loader
 
 import com.spike.sparkstreaming.config.{SparkSessionConfig, StreamingLoaderConfig}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.streaming.{OutputMode, Trigger}
+import org.apache.spark.storage.StorageLevel
 
 object JsonMsgSecurityDataLoaderWithForEachBatch extends App with Serializable{
 
@@ -22,25 +23,34 @@ object JsonMsgSecurityDataLoaderWithForEachBatch extends App with Serializable{
     .load()
     .select(col("key").cast("string"), col("value").cast("string"))
 
-
-  initDf
+  val query = initDf
     .writeStream
     .trigger(Trigger.ProcessingTime("5 seconds"))
-    /*.foreachBatch { (batchDF: DataFrame, batchId: Long) =>
-      batchDF.unpersist()
+    .foreachBatch((incomingdata: DataFrame, batchId: Long) => {
+      incomingdata.persist(StorageLevel.MEMORY_ONLY)
+
+      incomingdata.show(false)
+
+      incomingdata.foreach((row) => {
+        val data = row.getAs[String]("value")
+
+        data.contains("equity") match {
+          case true =>
+            println("This is Equity data ---> " + data)
+          case false =>
+            data.contains("corp") match {
+              case true =>
+                println("This is CORP data ---> " + data)
+              case false =>
+            }
+        }
+      })
       println("batchId is -->" + batchId)
-      batchDF.show(false)
-      batchDF.unpersist()
-    }*/
-    /*.foreachBatch((batchDF, batchId) => {
-      batchDF.unpersist()
-      println("batchId is -->" + batchId)
-      batchDF.show(false)
-      batchDF.unpersist()
-    })*/
-    .outputMode("update")
-    .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location/")
+    })
+    .outputMode(OutputMode.Update())
+    .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location-3/")
     .start()
-    .awaitTermination()
+
+  query.awaitTermination()
 
 }

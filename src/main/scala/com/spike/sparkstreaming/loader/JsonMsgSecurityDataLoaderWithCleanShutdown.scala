@@ -1,12 +1,16 @@
 package com.spike.sparkstreaming.loader
 
 import com.spike.sparkstreaming.config.{SparkSessionConfig, StreamingLoaderConfig}
-import org.apache.spark.sql.streaming.Trigger
+import com.spike.sparkstreaming.hdfs.{HDFSConfig, HDFSFileReader}
+import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
-class JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
+import scala.util.control.Breaks.{break, breakable}
+
+object JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
 
   implicit val sparkSession = SparkSessionConfig("JsonMsgSecurityDataLoaderWithCleanShutdown", true).getSparkSession
 
+  val fileFullyQualifiedUri = ""
   val configFilePath = "src/main/resources/application.conf"
   val streamingLoaderConfig = StreamingLoaderConfig(configFilePath)
 
@@ -23,13 +27,35 @@ class JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
 
   val df2 = initDf.withColumnRenamed("value", "input-data").drop("key")
 
-  df2
+  val query = df2
     .writeStream
     .trigger(Trigger.ProcessingTime("5 seconds"))
     .outputMode("update")
     .format("console")
-    .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location/")
+    .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location-4/")
     .start()
-    .awaitTermination()
+
+  val hdfsFileReader = new HDFSFileReader(new HDFSConfig)
+  val gracefulShutDownTimeMs = "1000".toLong
+
+  breakable{
+    try{
+      while(true){
+        println("-----inside while loop-----")
+        if(hdfsFileReader.checkFileExists(fileFullyQualifiedUri)){
+          stopStreamQuery(query, gracefulShutDownTimeMs)
+          break;
+        }else{
+          query.awaitTermination(gracefulShutDownTimeMs)
+        }
+      }
+    }finally{
+      hdfsFileReader.closeFileSystem
+    }
+  }
+
+  private def stopStreamQuery(query: StreamingQuery, gracefulShutDownTimeMs: Long): Unit = {
+
+  }
 
 }

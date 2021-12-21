@@ -9,9 +9,14 @@ class StreamingLoaderConfig (applicationConfFile: String) extends Serializable {
 
   lazy val bootstrapServers= config.getString("streaming_loader_config.kafka.bootstrap.servers")
 
-  lazy val jsonInputDataTopicName = config.getString("streaming_loader_config.json_message.topic_name")
+  lazy val jsonInputDataTopicName = config.getString("streaming_loader_config.json_message.input_topic_name")
   lazy val jsonMsgKeySerializer = config.getString("streaming_loader_config.json_message.key_serializer")
   lazy val jsonMsgValueSerializer = config.getString("streaming_loader_config.json_message.value_serializer")
+
+  lazy val equityOutputDataTopicName = config.getString("streaming_loader_config.json_message.equity_output_topic_name")
+  lazy val corpOutputDataTopicName = config.getString("streaming_loader_config.json_message.corp_output_topic_name")
+  lazy val govtOutputDataTopicName = config.getString("streaming_loader_config.json_message.govt_output_topic_name")
+  lazy val muniOutputDataTopicName = config.getString("streaming_loader_config.json_message.muni_output_topic_name")
 
 }
 
