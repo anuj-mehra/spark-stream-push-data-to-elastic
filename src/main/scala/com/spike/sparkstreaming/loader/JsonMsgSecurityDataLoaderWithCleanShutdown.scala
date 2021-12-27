@@ -25,15 +25,18 @@ object JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
     .load()
     .select(col("key").cast("string"), col("value").cast("string"))
 
+
   val df2 = initDf.withColumnRenamed("value", "input-data").drop("key")
 
   val query = df2
     .writeStream
-    .trigger(Trigger.ProcessingTime("5 seconds"))
+    .trigger(Trigger.ProcessingTime("10 seconds"))
     .outputMode("update")
     .format("console")
     .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location-4/")
     .start()
+
+  query.awaitTermination
 
   val hdfsFileReader = new HDFSFileReader(new HDFSConfig)
   val gracefulShutDownTimeMs = "1000".toLong

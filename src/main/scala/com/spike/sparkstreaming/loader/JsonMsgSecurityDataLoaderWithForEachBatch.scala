@@ -1,6 +1,8 @@
 package com.spike.sparkstreaming.loader
 
 import com.spike.sparkstreaming.config.{SparkSessionConfig, StreamingLoaderConfig}
+import com.spike.sparkstreaming.http.{HTTPGetClient, HTTPPostClient, HTTPPutClient}
+import com.spike.sparkstreaming.securitydataproducer.{SecurityData, SecurityDataJSONConverter}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 import org.apache.spark.storage.StorageLevel
@@ -23,24 +25,38 @@ object JsonMsgSecurityDataLoaderWithForEachBatch extends App with Serializable{
     .load()
     .select(col("key").cast("string"), col("value").cast("string"))
 
+  val httpPutClient = new HTTPPutClient
+
   val query = initDf
     .writeStream
     .trigger(Trigger.ProcessingTime("5 seconds"))
     .foreachBatch((incomingdata: DataFrame, batchId: Long) => {
+
+      val numPartitions = incomingdata.rdd.getNumPartitions
+
+      println("numPartitions ---> " + numPartitions)
+
       incomingdata.persist(StorageLevel.MEMORY_ONLY)
 
       incomingdata.show(false)
 
       incomingdata.foreach((row) => {
-        val data = row.getAs[String]("value")
+        val json = row.getAs[String]("value")
+        val securityData: SecurityData = SecurityDataJSONConverter.convertFromJson(json)
 
-        data.contains("equity") match {
+        securityData.securityType.equals("equity") match {
           case true =>
-            println("This is Equity data ---> " + data)
+            val uri = s"http://localhost:9200/equity/_doc/${securityData.id}"
+            println("uri--->" + uri)
+            val putResponse = httpPutClient.put(uri, json)
+            println(putResponse)
           case false =>
-            data.contains("corp") match {
+            securityData.securityType.equals("corp") match {
               case true =>
-                println("This is CORP data ---> " + data)
+                val uri = s"http://localhost:9200/corp/_doc/${securityData.id}"
+                println("uri--->" + uri)
+                val putResponse = httpPutClient.put(uri, json)
+                println(putResponse)
               case false =>
             }
         }
@@ -52,5 +68,4 @@ object JsonMsgSecurityDataLoaderWithForEachBatch extends App with Serializable{
     .start()
 
   query.awaitTermination()
-
 }
