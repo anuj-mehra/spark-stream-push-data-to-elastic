@@ -40,6 +40,10 @@ kafka-console-consumer --topic govtdata  --bootstrap-server localhost:9092 --fro
 
 kafka-console-consumer --topic munidata  --bootstrap-server localhost:9092 --from-beginning
 
+## Starting ElasticSearch cluster on local;
+cd /Users/anujmehra/apps/elasticsearch-7.16.1
+command to start the elastic searh --> bin/elasticsearch
+
 ## Curl commands to fetch meta-data;
 curl -XGET 'localhost:9200/_cat/indices?v&pretty'
 
@@ -63,16 +67,6 @@ curl -XPUT 'localhost:9200/equity/1?pretty' -d'
 {
 // actual json message to be saved
 }
-Sample;
-curl -X PUT "localhost:9200/muni/_doc/MS99?timeout=5m&pretty" -H 'Content-Type: application/json' -d'
-{
-"@timestamp": "2099-11-15T13:12:00",
-"message": "GET /search HTTP/1.1 200 1070000",
-"user": {
-"id": "MS99"
-}
-}
-'
 
 ### Exmple is as below;
 PUT uri---> http://localhost:9200/equity/_doc/MS9
@@ -137,6 +131,9 @@ There are two ways to search values from the index;
 2. Match Query
 
 ###Term Query --> Returns documents that contain an exact term in a provided field. 
+
+Term level queries are used to query structured data, which would usually be the exact values.
+
 You can use the term query to find documents based on a precise value such as a price, a product ID, or a username.
 
 The term is a perfect match, that is, an exact query. The search term will not be segmented before the search, 
@@ -145,7 +142,34 @@ so our search term must be one of the document segmentation sets. Let’s say we
 The term query does not analyze the search term. The term query only searches for the exact term you provide. 
 This means the term query may return poor or no results when searching text fields.
 
-###Match Query --> Returns documents that match a provided text, number, date or boolean value. The provided text is analyzed before matching.
+curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+   "query":{
+      "term":{
+         "isin":"ms98"
+      }
+   }
+}'
+
+#### Important to note --> here we have used ms98 and not MS98, as in inverted index, everything is first converted to small scale and then saved.
+#### Term search expects the exact same value that is saved in inverted index.
+
+### If we want to get only the ID's and not wanting thw whole document to be returned;
+
+curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+   "_source": "false",
+   "query":{
+      "term":{
+         "isin":"ms98"
+      }
+   }
+}'
+
+PS: We can update _source in above query, to return only few columns.
+
+
+### Match Query --> Returns documents that match a provided text, number, date or boolean value. The provided text is analyzed before matching.
 
 The match query is the standard query for performing a full-text search, including options for fuzzy matching.
 
@@ -154,6 +178,8 @@ Avoid using the term query for text fields.
 By default, Elasticsearch changes the values of text fields as part of analysis. This can make finding exact matches for text field values difficult.
 
 To search text field values, use the match query instead.
+
+Using Match Query, we can even write complex queries, like adding "AND" | "OR" etc.
 
 #### Following command will search 'MS98' in the 'isin' column | Exact Keyword Match;
 curl -X GET "localhost:9200/equity/_search?q=isin:MS98&pretty"
@@ -168,8 +194,8 @@ curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application
 }'
 
 #### Following command will search 'MS98' in the whole document (only given columns) | Exact Keyword Match;
-curl -X GET "localhost:9200/equity/_search?q=MS98&pretty"
 
+curl -X GET "localhost:9200/equity/_search?q=MS98&pretty"
 
 curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
 {
@@ -181,8 +207,71 @@ curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application
    }
 }'
 
-#### Following command will search start with 'MS9' in the 'isin' column;
+OR
 
+curl -X POST 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+   "query":{
+      "multi_match":{
+         "query":"MS98",
+         "fields":["isin", "cusip"]
+      }
+   }
+}'
+
+#### Following command will search 'MS98' or 'MS99' in the 'isin' column;
+
+PS: The default "operator" is "or"
+
+curl -X POST 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+   "query":{
+      "multi_match":{
+         "query":"MS98 MS99",
+         "operator" : "or",
+         "fields":["isin", "cusip"]
+      }
+   }
+}'
+
+#### Following command will search containing 'MS98' in the 'isin' column (match_phrase);
+
+curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+   "query":{
+      "match_phrase":{
+         "isin": {
+            "query":"MS98"
+         }
+      }
+   }
+}'
+
+#### Following command will search start with 'MS9' in the 'isin' column (match_phrase_prefix);
+
+curl -X POST 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+   "query":{
+      "match_phrase_prefix":{
+         "isin": {
+            "query":"MS9"
+         }
+      }
+   }
+}'
+
+OR
+
+curl -X POST 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application/json' -d'
+{
+"query":{
+"match_phrase_prefix":[{
+"isin": {
+"query":"MS9"
+}
+}]
+}
+}'
 
 ## Sort searched response data in an order;
 ### PS: when we do the sorting, the relevance score becomes null, as the relevance score no longer applies
@@ -217,13 +306,15 @@ curl -X GET 'localhost:9200/equity/_search?pretty' -H 'Content-Type: application
 4. View elastic search data using Kibana
 
 
-
 ## Helpful links
+
+https://coralogix.com/blog/42-elasticsearch-query-examples-hands-on-tutorial/
 
 https://coralogix.com/blog/42-elasticsearch-query-examples-hands-on-tutorial/
 
 https://dzone.com/articles/23-useful-elasticsearch-example-queries
 
+https://stackoverflow.com/questions/51957817/mongodb-vs-elasticsearch-query-aggregation-performance-comparison
 
 
 
