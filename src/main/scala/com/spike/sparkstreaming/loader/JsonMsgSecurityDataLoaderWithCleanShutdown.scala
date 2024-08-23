@@ -2,7 +2,7 @@ package com.spike.sparkstreaming.loader
 
 import com.spike.sparkstreaming.config.{SparkSessionConfig, StreamingLoaderConfig}
 import com.spike.sparkstreaming.hdfs.{HDFSConfig, HDFSFileReader}
-import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
 import scala.util.control.Breaks.{break, breakable}
 
@@ -15,6 +15,8 @@ object JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
   val streamingLoaderConfig = StreamingLoaderConfig(configFilePath)
 
   import org.apache.spark.sql.functions.col
+
+  this.cleanupPreviousShutdown(fileFullyQualifiedUri)
 
   val initDf = sparkSession
     .readStream
@@ -31,21 +33,21 @@ object JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
   val query = df2
     .writeStream
     .trigger(Trigger.ProcessingTime("10 seconds"))
-    .outputMode("update")
+    .outputMode(OutputMode.Update())
     .format("console")
     .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location-4/")
     .start()
 
-  query.awaitTermination
+  //query.awaitTermination
 
-  val hdfsFileReader = new HDFSFileReader(new HDFSConfig)
+  val hdfsFileReader = HDFSFileReader.apply
   val gracefulShutDownTimeMs = "1000".toLong
 
   breakable{
     try{
       while(true){
         println("-----inside while loop-----")
-        if(hdfsFileReader.checkFileExists(fileFullyQualifiedUri)){
+        if(hdfsFileReader.checkFileExistsForStreaming(fileFullyQualifiedUri)){
           stopStreamQuery(query, gracefulShutDownTimeMs)
           break;
         }else{
@@ -59,6 +61,26 @@ object JsonMsgSecurityDataLoaderWithCleanShutdown extends App with Serializable{
 
   private def stopStreamQuery(query: StreamingQuery, gracefulShutDownTimeMs: Long): Unit = {
 
+    while(query.isActive){
+      val msg = query.status.message
+
+      (query.status.isDataAvailable, query.status.isTriggerActive, msg.equals("Initializing sources")) match {
+        case (true, true, true) =>
+          println("----query can be terminated---")
+          query.stop
+        case _ =>
+          query.awaitTermination(gracefulShutDownTimeMs)
+      }
+    }
+  }
+
+  private def cleanupPreviousShutdown(gracefulShutdownFile:String): Unit = {
+    val hdfsFileReader: HDFSFileReader = HDFSFileReader.apply
+    hdfsFileReader.checkFileExistsForStreaming(gracefulShutdownFile) match {
+      case true =>
+        hdfsFileReader.deleteFile(gracefulShutdownFile, false)
+      case false =>
+    }
   }
 
 }

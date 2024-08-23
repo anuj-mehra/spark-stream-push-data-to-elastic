@@ -35,7 +35,7 @@ object SecurityDataType extends Enumeration {
   val EQUITY = Value("equity").toString
   val CORP = Value("corp").toString
   val MUNI = Value("muni").toString
-  val GOVT = Value("govy").toString
+  val GOVT = Value("govt").toString
 
 }
 
