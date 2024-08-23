@@ -283,11 +283,28 @@ curl -X POST 'localhost:9200/equity/_search?pretty' -H 'Content-Type: applicatio
 ## Fetch only certain fields in response;
 
 
+## Boolean Compound Query;
+
+must --> The clause must appear in the document.
+
+should --> may or may not occut
+
+must_not --> must not be present in the document (exclusion)
+
+
+## Adding a "boost" in the query
+
+
 
 ## Algo for relevance score;
 
+---> TF/IDF Relevance Algorithm
 
+## Important things to read;
 
+1. common query
+
+2. cutoff_frequency --> a frequency post which we consider a word as a common term.
 
 ## 'securitydata' Topic Schema
 {

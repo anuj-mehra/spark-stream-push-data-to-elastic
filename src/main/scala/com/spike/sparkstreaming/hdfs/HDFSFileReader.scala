@@ -9,7 +9,11 @@ class HDFSFileReader(hdfsConfig: HDFSConfig) extends Serializable {
     fs.exists(new Path(fileFullyQualifiedUri))
   }
 
-  def closeFileSystem = ???
+
+  def closeFileSystem: Unit = {
+
+
+  }
 
 
 }

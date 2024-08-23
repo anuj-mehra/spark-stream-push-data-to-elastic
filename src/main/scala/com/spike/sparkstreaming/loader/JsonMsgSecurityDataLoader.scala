@@ -1,7 +1,7 @@
 package com.spike.sparkstreaming.loader
 
 import com.spike.sparkstreaming.config.{SparkSessionConfig, StreamingLoaderConfig}
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 object JsonMsgSecurityDataLoader extends App with Serializable{
 
@@ -26,7 +26,7 @@ object JsonMsgSecurityDataLoader extends App with Serializable{
   df2
     .writeStream
     .trigger(Trigger.ProcessingTime("5 seconds"))
-    .outputMode("update")
+    .outputMode(OutputMode.Update())
     .format("console")
     .option("checkpointLocation", "/Users/anujmehra/git/spark-stream-push-data-to-elastic/src/main/resources/checkpoint-location/")
     .start()
